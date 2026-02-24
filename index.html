@@ -1491,20 +1491,27 @@
                         <label class="form-label">Confirm Password</label>
                         <input type="password" class="form-input" id="signupPasswordConfirm" required placeholder="Re-enter your password" minlength="6">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Role</label>
-                        <select class="form-select" id="signupRole">
-                            <option value="engineer">Engineer</option>
-                            <option value="manager">Manager</option>
-                            <option value="admin">Admin</option>
-                            <option value="viewer">Viewer</option>
-                        </select>
-                    </div>
                     <button type="submit" class="btn-auth" id="signupBtn">Sign Up</button>
                 </form>
                 <div class="auth-toggle">
                     Already have an account? <a onclick="showAuthSection('login')">Log in</a>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approval Screen -->
+    <div id="pendingScreen" style="display:none;">
+        <div style="position:fixed;inset:0;background:linear-gradient(135deg,#0052CC 0%,#0066FF 50%,#3385FF 100%);display:flex;align-items:center;justify-content:center;z-index:9998;">
+            <div class="auth-card" style="text-align:center;">
+                <div class="auth-logo">
+                    <div class="logo-icon">&#9881;&#65039;</div>
+                    <span>MaintainPro</span>
+                </div>
+                <div style="font-size:3rem;margin-bottom:1rem;">&#9203;</div>
+                <h2 style="margin-bottom:0.75rem;color:var(--dark);">Account Pending Approval</h2>
+                <p style="color:var(--gray-600);margin-bottom:1.5rem;line-height:1.6;">Your account has been created but is awaiting admin approval. You will be able to access the app once an administrator has reviewed and approved your account.</p>
+                <button class="btn-auth" onclick="handleLogout()" style="background:var(--gray-700);">Log Out</button>
             </div>
         </div>
     </div>
@@ -4134,8 +4141,29 @@
 
         var appInitialized = false;
 
-        function showApp(user) {
+        async function showApp(user) {
+            // Check if user's role is 'pending' — block access if so
+            var role = null;
+            if (user) {
+                var profileResult = await supabaseClient
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                if (profileResult.data) {
+                    role = profileResult.data.role;
+                }
+            }
+
+            if (role === 'pending') {
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('appContent').style.display = 'none';
+                document.getElementById('pendingScreen').style.display = '';
+                return;
+            }
+
             document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('pendingScreen').style.display = 'none';
             document.getElementById('appContent').style.display = '';
             if (user && user.email) {
                 document.getElementById('userEmailDisplay').textContent = user.email;
@@ -4167,6 +4195,7 @@
         function showAuthScreen() {
             document.getElementById('authScreen').classList.remove('hidden');
             document.getElementById('appContent').style.display = 'none';
+            document.getElementById('pendingScreen').style.display = 'none';
             document.getElementById('userEmailDisplay').textContent = '';
         }
 
@@ -4177,7 +4206,6 @@
             var email = document.getElementById('signupEmail').value.trim();
             var password = document.getElementById('signupPassword').value;
             var confirm = document.getElementById('signupPasswordConfirm').value;
-            var role = document.getElementById('signupRole').value;
 
             if (password !== confirm) {
                 showAuthMessage('Passwords do not match.', 'error');
@@ -4192,7 +4220,7 @@
                 email: email,
                 password: password,
                 options: {
-                    data: { full_name: name, role: role }
+                    data: { full_name: name, role: 'pending' }
                 }
             });
 
@@ -4204,7 +4232,7 @@
                 return;
             }
 
-            showAuthMessage('Account created! Check your email to confirm, then log in.', 'success');
+            showAuthMessage('Account created! An admin will review and approve your access. Check your email to confirm your address, then you can log in.', 'success');
             showAuthSection('login');
         }
 
@@ -4231,18 +4259,19 @@
                 return;
             }
 
-            showApp(result.data.user);
+            await showApp(result.data.user);
         }
 
         async function handleLogout() {
             await supabaseClient.auth.signOut();
+            appInitialized = false;
             showAuthScreen();
         }
 
         async function checkAuthOnLoad() {
             var result = await supabaseClient.auth.getSession();
             if (result.data.session) {
-                showApp(result.data.session.user);
+                await showApp(result.data.session.user);
                 return true;
             }
             showAuthScreen();
@@ -4250,10 +4279,11 @@
         }
 
         // Listen for auth state changes (e.g. session expiry, tab focus)
-        supabaseClient.auth.onAuthStateChange(function(event, session) {
+        supabaseClient.auth.onAuthStateChange(async function(event, session) {
             if (event === 'SIGNED_IN' && session) {
-                showApp(session.user);
+                await showApp(session.user);
             } else if (event === 'SIGNED_OUT') {
+                appInitialized = false;
                 showAuthScreen();
             }
         });
@@ -5854,4 +5884,4 @@
 </body>
 </html>
 
-supabase add authentification
+approve user update
