@@ -1286,11 +1286,231 @@
                 width: auto;
             }
         }
+
+        /* ── Auth Screen ── */
+        #authScreen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #0052CC 0%, #0066FF 50%, #3385FF 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        #authScreen.hidden { display: none; }
+
+        .auth-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .auth-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .auth-logo .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .auth-logo span {
+            font-weight: 700;
+            font-size: 1.75rem;
+            color: var(--primary);
+        }
+
+        .auth-title {
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+        }
+
+        .auth-form .form-group { margin-bottom: 1rem; }
+
+        .auth-form .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+            color: var(--gray-700);
+        }
+
+        .auth-form .form-input,
+        .auth-form .form-select {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .auth-form .form-input:focus,
+        .auth-form .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .auth-form .btn-auth {
+            width: 100%;
+            padding: 0.8rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .auth-form .btn-auth:hover { background: var(--primary-dark); }
+        .auth-form .btn-auth:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 1.25rem;
+            font-size: 0.9rem;
+            color: var(--gray-600);
+        }
+
+        .auth-toggle a {
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .auth-toggle a:hover { text-decoration: underline; }
+
+        .auth-message {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .auth-message.error {
+            display: block;
+            background: #FFF0F0;
+            color: var(--danger);
+            border: 1px solid #FFCDD2;
+        }
+
+        .auth-message.success {
+            display: block;
+            background: #F0FFF4;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+
+        .auth-form-section { display: none; }
+        .auth-form-section.active { display: block; }
+
+        .user-email-display {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
     <!-- Toast container -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Auth Screen -->
+    <div id="authScreen">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="logo-icon">&#9881;&#65039;</div>
+                <span>MaintainPro</span>
+            </div>
+
+            <div id="authMessage" class="auth-message"></div>
+
+            <!-- Login Form -->
+            <div id="loginSection" class="auth-form-section active">
+                <div class="auth-title">Log in to your account</div>
+                <form class="auth-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="loginEmail" required placeholder="you@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="loginPassword" required placeholder="Enter your password" minlength="6">
+                    </div>
+                    <button type="submit" class="btn-auth" id="loginBtn">Log In</button>
+                </form>
+                <div class="auth-toggle">
+                    Don't have an account? <a onclick="showAuthSection('signup')">Sign up</a>
+                </div>
+            </div>
+
+            <!-- Sign Up Form -->
+            <div id="signupSection" class="auth-form-section">
+                <div class="auth-title">Create a new account</div>
+                <form class="auth-form" onsubmit="handleSignUp(event)">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-input" id="signupName" required placeholder="John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="signupEmail" required placeholder="you@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="signupPassword" required placeholder="Minimum 6 characters" minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" class="form-input" id="signupPasswordConfirm" required placeholder="Re-enter your password" minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" id="signupRole">
+                            <option value="engineer">Engineer</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-auth" id="signupBtn">Sign Up</button>
+                </form>
+                <div class="auth-toggle">
+                    Already have an account? <a onclick="showAuthSection('login')">Log in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Content (hidden until authenticated) -->
+    <div id="appContent" style="display:none;">
 
     <!-- Header -->
     <header class="header">
@@ -1307,6 +1527,8 @@
                 <button class="btn btn-primary" onclick="openModal('workOrderModal')">
                     + New Work Order
                 </button>
+                <span class="user-email-display" id="userEmailDisplay"></span>
+                <button class="btn btn-secondary" onclick="handleLogout()">Log Out</button>
             </div>
         </div>
         
@@ -3877,6 +4099,8 @@
         </div>
     </div>
 
+    </div><!-- end #appContent -->
+
     <script>
         // ─────────────────────────────────────────────────────────────────────
         // SUPABASE CLIENT
@@ -3884,6 +4108,155 @@
         const SUPABASE_URL = 'https://ckjdwiipogxdkehxqrzh.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNramR3aWlwb2d4ZGtlaHhxcnpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTE5NDEsImV4cCI6MjA4NzQyNzk0MX0.lLXFAr42AgrkyakPZ4ketX0BfvLK9RayghmkIddXoYg';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ─────────────────────────────────────────────────────────────────────
+        // AUTHENTICATION
+        // ─────────────────────────────────────────────────────────────────────
+
+        function showAuthSection(section) {
+            document.getElementById('loginSection').classList.remove('active');
+            document.getElementById('signupSection').classList.remove('active');
+            document.getElementById(section === 'signup' ? 'signupSection' : 'loginSection').classList.add('active');
+            clearAuthMessage();
+        }
+
+        function showAuthMessage(text, type) {
+            const el = document.getElementById('authMessage');
+            el.textContent = text;
+            el.className = 'auth-message ' + type;
+        }
+
+        function clearAuthMessage() {
+            const el = document.getElementById('authMessage');
+            el.textContent = '';
+            el.className = 'auth-message';
+        }
+
+        var appInitialized = false;
+
+        function showApp(user) {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('appContent').style.display = '';
+            if (user && user.email) {
+                document.getElementById('userEmailDisplay').textContent = user.email;
+            }
+            if (!appInitialized) {
+                appInitialized = true;
+                if (typeof renderWorkOrders === 'function') {
+                    renderWorkOrders();
+                    renderEquipment();
+                    renderParts();
+                    renderPurchaseOrders();
+                    renderHotWorkPermits();
+                    renderContractorPermits();
+                    renderPM();
+                    updateNotificationCount();
+                    initializeCharts();
+                    if (typeof renderBreakdowns === 'function') {
+                        renderBreakdowns();
+                        renderCalendar();
+                        populateEquipDropdown('brMachine', false);
+                        populateEquipDropdown('brFilterMachine', true);
+                        populateEquipDropdown('brEditMachine', false);
+                        populateEquipDropdown('calEquipment', false);
+                    }
+                }
+            }
+        }
+
+        function showAuthScreen() {
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('appContent').style.display = 'none';
+            document.getElementById('userEmailDisplay').textContent = '';
+        }
+
+        async function handleSignUp(e) {
+            e.preventDefault();
+            var btn = document.getElementById('signupBtn');
+            var name = document.getElementById('signupName').value.trim();
+            var email = document.getElementById('signupEmail').value.trim();
+            var password = document.getElementById('signupPassword').value;
+            var confirm = document.getElementById('signupPasswordConfirm').value;
+            var role = document.getElementById('signupRole').value;
+
+            if (password !== confirm) {
+                showAuthMessage('Passwords do not match.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Signing up...';
+            clearAuthMessage();
+
+            var result = await supabaseClient.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: { full_name: name, role: role }
+                }
+            });
+
+            btn.disabled = false;
+            btn.textContent = 'Sign Up';
+
+            if (result.error) {
+                showAuthMessage(result.error.message, 'error');
+                return;
+            }
+
+            showAuthMessage('Account created! Check your email to confirm, then log in.', 'success');
+            showAuthSection('login');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            var btn = document.getElementById('loginBtn');
+            var email = document.getElementById('loginEmail').value.trim();
+            var password = document.getElementById('loginPassword').value;
+
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+            clearAuthMessage();
+
+            var result = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            btn.disabled = false;
+            btn.textContent = 'Log In';
+
+            if (result.error) {
+                showAuthMessage(result.error.message, 'error');
+                return;
+            }
+
+            showApp(result.data.user);
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            showAuthScreen();
+        }
+
+        async function checkAuthOnLoad() {
+            var result = await supabaseClient.auth.getSession();
+            if (result.data.session) {
+                showApp(result.data.session.user);
+                return true;
+            }
+            showAuthScreen();
+            return false;
+        }
+
+        // Listen for auth state changes (e.g. session expiry, tab focus)
+        supabaseClient.auth.onAuthStateChange(function(event, session) {
+            if (event === 'SIGNED_IN' && session) {
+                showApp(session.user);
+            } else if (event === 'SIGNED_OUT') {
+                showAuthScreen();
+            }
+        });
 
         // ─────────────────────────────────────────────────────────────────────
         // TOAST NOTIFICATIONS
@@ -4984,7 +5357,9 @@
         // ─────────────────────────────────────────────────────────────────────
         // INITIALIZE
         // ─────────────────────────────────────────────────────────────────────
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            var authed = await checkAuthOnLoad();
+            if (!authed) return;
             renderWorkOrders();
             renderEquipment();
             renderParts();
@@ -5473,18 +5848,10 @@
             showToast('Calendar event deleted.', 'info');
         }
 
-        // Init new tabs
-        document.addEventListener('DOMContentLoaded', function() {
-            renderBreakdowns();
-            renderCalendar();
-            populateEquipDropdown('brMachine',       false);
-            populateEquipDropdown('brFilterMachine', true);
-            populateEquipDropdown('brEditMachine',   false);
-            populateEquipDropdown('calEquipment',    false);
-        });
+        // Init new tabs — handled by showApp() after authentication
 
     </script>
 </body>
 </html>
 
-add supabase client
+supabase add authentification
