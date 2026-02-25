@@ -251,6 +251,7 @@
         }
 
         .tier-essential .order-part-btn { display: none; }
+        .tier-essential .pro-only-feature { display: none; }
 
         .tab-content {
             display: none;
@@ -3581,7 +3582,7 @@
 
                     <div class="form-group">
                         <label class="form-label">Category</label>
-                        <select class="form-select">
+                        <select class="form-select" id="addPartCategory">
                             <option value="">Select category...</option>
                             <option value="bearings">Bearings</option>
                             <option value="belts">Belts & Chains</option>
@@ -3592,9 +3593,41 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Vendor Information</label>
-                        <input type="text" class="form-input" placeholder="e.g., RS Components">
+                    <div class="pro-only-feature">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight:700;font-size:1rem;margin-bottom:0.5rem;">Supplier Information</label>
+                            <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1;">
+                                        <label class="form-label">Supplier</label>
+                                        <select class="form-select" id="partSupplierName">
+                                            <option value="">Select supplier...</option>
+                                            <option value="RS Components">RS Components</option>
+                                            <option value="Grainger">Grainger</option>
+                                            <option value="Motion Industries">Motion Industries</option>
+                                            <option value="Local Supplier">Local Supplier</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex:1;">
+                                        <label class="form-label">Supplier Part No.</label>
+                                        <input type="text" class="form-input" id="partSupplierPartNo" placeholder="e.g., 286-3421">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1;">
+                                        <label class="form-label">Price (£)</label>
+                                        <input type="number" class="form-input" id="partSupplierPrice" step="0.01" min="0" placeholder="e.g., 12.50">
+                                    </div>
+                                    <div class="form-group" style="flex:1;">
+                                        <label class="form-label">Lead Time</label>
+                                        <input type="text" class="form-input" id="partSupplierLeadTime" placeholder="e.g., Next day">
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="addPartSupplier()" style="align-self:flex-start;">+ Add Supplier</button>
+                            </div>
+                            <div id="partSupplierBuilder"></div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -3760,18 +3793,10 @@
                         <label class="form-label">Select Vendor *</label>
                         <select class="form-select" id="orderVendor" required>
                             <option value="">Choose vendor...</option>
-                            <option value="rs-components">RS Components - Next Day Delivery</option>
-                            <option value="grainger">Grainger - Same Day (if ordered before 2pm)</option>
-                            <option value="motion">Motion Industries - 2-3 Days</option>
-                            <option value="local">Local Supplier - Pick up today</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="checkVendorAvailability()">
-                            🔍 Check Vendor Availability & Pricing
-                        </button>
-                    </div>
+                    <div id="orderSupplierPanel"></div>
 
                     <div class="form-group">
                         <label class="form-label">Delivery Location</label>
@@ -4646,10 +4671,16 @@
 
         let nextPartId = loadData('nextPartId', 4);
         let partsData = loadData('parts', [
-            { id: 1, name: 'Motor Bearing 6205',   partNumber: 'PN-MB-6205-001', qty: 15, minStock: 8, shelf: 'B3', bin: '12', monthlyUsage: 3 },
-            { id: 2, name: 'Conveyor Belt 48"',    partNumber: 'PN-CB-48-002',   qty: 2,  minStock: 4, shelf: 'A1', bin: '5',  monthlyUsage: 1 },
-            { id: 3, name: 'Proximity Sensor M18', partNumber: 'PN-PS-M18-004',  qty: 0,  minStock: 5, shelf: 'D4', bin: '15', monthlyUsage: 2 }
+            { id: 1, name: 'Motor Bearing 6205',   partNumber: 'PN-MB-6205-001', qty: 15, minStock: 8, shelf: 'B3', bin: '12', monthlyUsage: 3, suppliers: [{supplier:'RS Components',supplierPartNo:'286-3421',price:8.50,leadTime:'Next day'},{supplier:'Grainger',supplierPartNo:'6Y839',price:9.20,leadTime:'Same day'}] },
+            { id: 2, name: 'Conveyor Belt 48"',    partNumber: 'PN-CB-48-002',   qty: 2,  minStock: 4, shelf: 'A1', bin: '5',  monthlyUsage: 1, suppliers: [{supplier:'Motion Industries',supplierPartNo:'MI-CB48-200',price:145.00,leadTime:'2-3 days'},{supplier:'Local Supplier',supplierPartNo:'BM-BELT-48',price:155.00,leadTime:'Pick up today'}] },
+            { id: 3, name: 'Proximity Sensor M18', partNumber: 'PN-PS-M18-004',  qty: 0,  minStock: 5, shelf: 'D4', bin: '15', monthlyUsage: 2, suppliers: [{supplier:'RS Components',supplierPartNo:'714-6258',price:22.80,leadTime:'Next day'}] }
         ]);
+
+        // Migrate existing parts: add suppliers if missing
+        partsData.forEach(function(p) {
+            if (!p.suppliers) p.suppliers = [];
+        });
+        saveData('parts', partsData);
 
         let nextPoId = loadData('nextPoId', 146);
         let purchaseOrdersData = loadData('purchaseOrders', [
@@ -4815,6 +4846,7 @@
                         <div class="part-detail-row"><span class="part-detail-label">Location</span><span class="part-detail-value">Shelf ${escHtml(p.shelf)}, Bin ${escHtml(p.bin)}</span></div>
                         <div class="part-detail-row"><span class="part-detail-label">Min Stock</span><span class="part-detail-value">${p.minStock} units</span></div>
                         <div class="part-detail-row"><span class="part-detail-label">Used This Month</span><span class="part-detail-value">${p.monthlyUsage} times</span></div>
+                        ${hasAccess('purchaseOrders') && p.suppliers && p.suppliers.length > 0 ? `<div class="part-detail-row"><span class="part-detail-label">Suppliers</span><span class="part-detail-value" style="color:var(--primary);font-weight:600;">${p.suppliers.length} supplier${p.suppliers.length > 1 ? 's' : ''}</span></div>` : ''}
                     </div>
                     <div style="display:flex;gap:0.5rem;margin-top:1rem;">
                         ${hasAccess('purchaseOrders') ? `<button class="btn ${orderBtnClass}" style="flex:1;" onclick="orderPart('${escHtml(p.partNumber)}','${escHtml(p.name)}',${stock.cls !== 'in-stock'})">${orderBtnLabel}</button>` : ''}
@@ -5381,10 +5413,12 @@
                 return;
             }
 
-            partsData.push({ id: nextPartId++, name, partNumber: number, qty, minStock, shelf, bin, monthlyUsage: 0 });
+            partsData.push({ id: nextPartId++, name, partNumber: number, qty, minStock, shelf, bin, monthlyUsage: 0, suppliers: partSupplierItems.slice() });
             renderParts();
             closeModal('addPartModal');
             document.getElementById('addPartForm').reset();
+            partSupplierItems = [];
+            renderPartSupplierBuilder();
             persistAllData();
             showToast('✅ Part added to inventory!', 'success');
         }
@@ -5401,6 +5435,9 @@
             document.getElementById('addPartMinStock').value = p.minStock;
             document.getElementById('addPartShelf').value    = p.shelf;
             document.getElementById('addPartBin').value      = p.bin;
+            // Load existing suppliers into builder
+            partSupplierItems = (p.suppliers || []).map(function(s) { return { supplier: s.supplier, supplierPartNo: s.supplierPartNo, price: s.price, leadTime: s.leadTime }; });
+            renderPartSupplierBuilder();
             // Change modal button behavior temporarily
             const btn = document.querySelector('#addPartModal .modal-footer .btn-primary');
             btn.textContent = 'Save Changes';
@@ -5418,9 +5455,12 @@
             p.minStock = parseInt(document.getElementById('addPartMinStock').value) || 0;
             p.shelf    = document.getElementById('addPartShelf').value.trim();
             p.bin      = document.getElementById('addPartBin').value.trim();
+            p.suppliers = partSupplierItems.slice();
             renderParts();
             closeModal('addPartModal');
             document.getElementById('addPartForm').reset();
+            partSupplierItems = [];
+            renderPartSupplierBuilder();
             // Reset button
             const btn = document.querySelector('#addPartModal .modal-footer .btn-primary');
             btn.textContent = 'Add Part';
@@ -5448,7 +5488,42 @@
             document.getElementById('orderUrgency').textContent = isEmergency ? '🚨 EMERGENCY ORDER' : 'Standard Order';
             document.getElementById('orderUrgency').style.color = isEmergency ? 'var(--danger)' : 'var(--primary)';
             document.getElementById('orderQuantity').value = '';
-            document.getElementById('orderVendor').value = '';
+
+            // Populate vendor dropdown and supplier panel from part's supplier data
+            var part = partsData.find(function(p) { return p.partNumber === partNumber; });
+            var suppliers = (part && part.suppliers) ? part.suppliers : [];
+            var vendorSelect = document.getElementById('orderVendor');
+            var panel = document.getElementById('orderSupplierPanel');
+
+            if (suppliers.length > 0) {
+                // Populate vendor dropdown from part's suppliers
+                vendorSelect.innerHTML = '<option value="">Choose vendor...</option>' +
+                    suppliers.map(function(s) {
+                        return '<option value="' + escHtml(s.supplier) + '">' + escHtml(s.supplier) + ' — ' + escHtml(s.leadTime) + '</option>';
+                    }).join('');
+
+                // Show supplier comparison panel
+                panel.innerHTML = '<div style="margin-bottom:1rem;padding:1rem;background:var(--gray-100);border-radius:8px;border-left:4px solid var(--primary);">' +
+                    '<div style="font-weight:700;margin-bottom:0.75rem;">Supplier Stock & Pricing</div>' +
+                    '<div style="display:flex;flex-direction:column;gap:0.5rem;">' +
+                    suppliers.map(function(s) {
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;background:var(--white);border-radius:6px;border:1px solid var(--gray-200);">' +
+                            '<div><strong>' + escHtml(s.supplier) + '</strong><div style="font-size:0.8rem;color:var(--gray-500);font-family:\'IBM Plex Mono\',monospace;">' + escHtml(s.supplierPartNo) + '</div></div>' +
+                            '<div style="text-align:right;"><div style="font-weight:700;color:var(--success);">£' + s.price.toFixed(2) + '</div><div style="font-size:0.8rem;color:var(--gray-500);">' + escHtml(s.leadTime) + '</div></div>' +
+                        '</div>';
+                    }).join('') +
+                    '</div></div>';
+            } else {
+                // No suppliers recorded — show fallback with hardcoded vendor options
+                vendorSelect.innerHTML = '<option value="">Choose vendor...</option>' +
+                    '<option value="RS Components">RS Components - Next Day Delivery</option>' +
+                    '<option value="Grainger">Grainger - Same Day (if ordered before 2pm)</option>' +
+                    '<option value="Motion Industries">Motion Industries - 2-3 Days</option>' +
+                    '<option value="Local Supplier">Local Supplier - Pick up today</option>';
+                panel.innerHTML = '<div style="margin-bottom:1rem;padding:0.75rem;background:var(--gray-100);border-radius:8px;color:var(--gray-500);font-size:0.9rem;">No supplier information recorded for this part yet. Add suppliers via the part edit form.</div>';
+            }
+
+            vendorSelect.value = '';
             openModal('orderPartModal');
         }
 
@@ -5486,10 +5561,6 @@
             document.getElementById('orderPartForm').reset();
             persistAllData();
             showToast(`✅ ${poNumber} created and added to Purchase Orders!`, 'success');
-        }
-
-        function checkVendorAvailability() {
-            showToast('In a live system, this would query vendor APIs for real-time stock & pricing.', 'info');
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -5759,6 +5830,43 @@
             if (type === 'hotwork') {
                 closeHotWorkPermit(permitId);
             }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // PART SUPPLIER BUILDER
+        // ─────────────────────────────────────────────────────────────────────
+        var partSupplierItems = [];
+
+        function addPartSupplier() {
+            var supplier    = document.getElementById('partSupplierName').value;
+            var partNo      = document.getElementById('partSupplierPartNo').value.trim();
+            var price       = parseFloat(document.getElementById('partSupplierPrice').value);
+            var leadTime    = document.getElementById('partSupplierLeadTime').value.trim();
+            if (!supplier) { showToast('Please select a supplier.', 'error'); return; }
+            if (!partNo) { showToast('Please enter a supplier part number.', 'error'); return; }
+            partSupplierItems.push({ supplier: supplier, supplierPartNo: partNo, price: isNaN(price) ? 0 : price, leadTime: leadTime || '—' });
+            document.getElementById('partSupplierName').value = '';
+            document.getElementById('partSupplierPartNo').value = '';
+            document.getElementById('partSupplierPrice').value = '';
+            document.getElementById('partSupplierLeadTime').value = '';
+            renderPartSupplierBuilder();
+        }
+
+        function removePartSupplier(idx) {
+            partSupplierItems.splice(idx, 1);
+            renderPartSupplierBuilder();
+        }
+
+        function renderPartSupplierBuilder() {
+            var container = document.getElementById('partSupplierBuilder');
+            if (!container) return;
+            if (partSupplierItems.length === 0) { container.innerHTML = ''; return; }
+            container.innerHTML = partSupplierItems.map(function(s, i) {
+                return '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.75rem;background:var(--gray-100);border-radius:6px;margin-bottom:0.5rem;">' +
+                    '<span style="flex:1;"><strong>' + escHtml(s.supplier) + '</strong> · ' + escHtml(s.supplierPartNo) + ' · £' + s.price.toFixed(2) + ' · ' + escHtml(s.leadTime) + '</span>' +
+                    '<button type="button" onclick="removePartSupplier(' + i + ')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem;">✕</button>' +
+                '</div>';
+            }).join('');
         }
 
         // ─────────────────────────────────────────────────────────────────────
