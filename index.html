@@ -5400,6 +5400,21 @@
         // ─────────────────────────────────────────────────────────────────────
         // PARTS CRUD
         // ─────────────────────────────────────────────────────────────────────
+        function capturePendingSupplier() {
+            var supplier = document.getElementById('partSupplierName').value;
+            var partNo   = document.getElementById('partSupplierPartNo').value.trim();
+            if (supplier && partNo) {
+                var price    = parseFloat(document.getElementById('partSupplierPrice').value);
+                var leadTime = document.getElementById('partSupplierLeadTime').value.trim();
+                partSupplierItems.push({ supplier: supplier, supplierPartNo: partNo, price: isNaN(price) ? 0 : price, leadTime: leadTime || '—' });
+                document.getElementById('partSupplierName').value = '';
+                document.getElementById('partSupplierPartNo').value = '';
+                document.getElementById('partSupplierPrice').value = '';
+                document.getElementById('partSupplierLeadTime').value = '';
+                renderPartSupplierBuilder();
+            }
+        }
+
         function submitAddPart() {
             const name     = document.getElementById('addPartName').value.trim();
             const number   = document.getElementById('addPartNumber').value.trim();
@@ -5413,6 +5428,7 @@
                 return;
             }
 
+            capturePendingSupplier();
             partsData.push({ id: nextPartId++, name, partNumber: number, qty, minStock, shelf, bin, monthlyUsage: 0, suppliers: partSupplierItems.slice() });
             renderParts();
             closeModal('addPartModal');
@@ -5455,6 +5471,7 @@
             p.minStock = parseInt(document.getElementById('addPartMinStock').value) || 0;
             p.shelf    = document.getElementById('addPartShelf').value.trim();
             p.bin      = document.getElementById('addPartBin').value.trim();
+            capturePendingSupplier();
             p.suppliers = partSupplierItems.slice();
             renderParts();
             closeModal('addPartModal');
