@@ -1,4 +1,4 @@
-var CACHE_NAME = 'cradero-v1';
+var CACHE_NAME = 'cradero-v2';
 var PRECACHE_URLS = [
     './',
     './index.html',
@@ -31,7 +31,7 @@ self.addEventListener('activate', function(event) {
     );
 });
 
-// Fetch: network-first for Supabase API, cache-first for everything else
+// Fetch: network-first for everything, fall back to cache when offline
 self.addEventListener('fetch', function(event) {
     var url = new URL(event.request.url);
 
@@ -41,18 +41,20 @@ self.addEventListener('fetch', function(event) {
     }
 
     event.respondWith(
-        caches.match(event.request).then(function(cached) {
-            if (cached) return cached;
-            return fetch(event.request).then(function(response) {
-                if (response.ok) {
-                    var clone = response.clone();
-                    caches.open(CACHE_NAME).then(function(cache) {
-                        cache.put(event.request, clone);
-                    });
-                }
-                return response;
-            }).catch(function() {
-                // Offline and not cached — return cached index for navigation
+        fetch(event.request).then(function(response) {
+            // Got a fresh response — cache it for offline use
+            if (response.ok) {
+                var clone = response.clone();
+                caches.open(CACHE_NAME).then(function(cache) {
+                    cache.put(event.request, clone);
+                });
+            }
+            return response;
+        }).catch(function() {
+            // Offline — serve from cache
+            return caches.match(event.request).then(function(cached) {
+                if (cached) return cached;
+                // Last resort for navigation — return cached index
                 if (event.request.mode === 'navigate') {
                     return caches.match('./index.html');
                 }
