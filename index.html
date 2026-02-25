@@ -2526,6 +2526,32 @@
                     <input type="text" class="search-input" placeholder="Search PM tasks by equipment or description...">
                 </div>
 
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="pmFilterStatus" style="min-width:160px;">
+                            <option value="">All</option>
+                            <option value="completed">Complete</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="unscheduled">Unscheduled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Equipment</label>
+                        <select class="form-select" id="pmFilterEquipment" style="min-width:180px;"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">From</label>
+                        <input type="date" class="form-input" id="pmFilterFrom" style="min-width:140px;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">To</label>
+                        <input type="date" class="form-input" id="pmFilterTo" style="min-width:140px;">
+                    </div>
+                    <button class="btn btn-secondary" onclick="filterPMs()" style="align-self:flex-end;">Apply Filter</button>
+                    <button class="btn btn-secondary" onclick="clearPMFilter()" style="align-self:flex-end;">Clear</button>
+                </div>
+
                 <div class="pm-list" id="pmList">
                     <div class="pm-item overdue">
                         <div class="pm-info">
@@ -4647,11 +4673,11 @@
 
         let nextPmId = loadData('nextPmId', 6);
         let pmData = loadData('pmSchedule', [
-            { id: 'fire-alarm',    title: '🔥 Fire Alarm System - Weekly Test',    equipment: 'Facility-Wide',        frequency: 'Weekly (Every Monday)', duration: '15 minutes', assignedTo: 'Mike Johnson',    dueStatus: 'overdue',  dueText: 'Overdue by 1 day', status: 'overdue',   lastCompleted: 'Feb 5, 2026', checklist: [{text:'Test all call points on each floor',checked:false,note:''},{text:'Verify panel shows no faults',checked:false,note:''},{text:'Check sounder/beacon activation',checked:false,note:''},{text:'Log result in fire safety register',checked:false,note:''}] },
-            { id: 'emerg-light',   title: '💡 Emergency Lighting - Monthly Test',   equipment: 'All Emergency Exits',  frequency: 'Monthly (1st of month)', duration: '45 minutes', assignedTo: 'Sarah Williams',  dueStatus: 'due-soon', dueText: 'Due in 2 days',    status: 'due-soon',  lastCompleted: 'Jan 1, 2026', checklist: [{text:'Activate test switch on each unit',checked:false,note:''},{text:'Verify illumination for 3+ hours',checked:false,note:''},{text:'Replace any failed bulbs/batteries',checked:false,note:''},{text:'Record results in maintenance log',checked:false,note:''}] },
-            { id: 'line3-lube',    title: 'Line 3 Filler - Monthly Lubrication',   equipment: 'Line 3 Filler',        frequency: 'Monthly',               duration: '30 minutes', assignedTo: 'Sarah Williams',  dueStatus: 'overdue',  dueText: 'Overdue by 2 days', status: 'overdue',  lastCompleted: 'Jan 12, 2026', checklist: [{text:'Grease all bearing points',checked:false,note:''},{text:'Check oil level in gearbox',checked:false,note:''},{text:'Inspect seals for leaks',checked:false,note:''},{text:'Clean excess lubricant',checked:false,note:''},{text:'Record lubricant quantities used',checked:false,note:''}] },
-            { id: 'line1-belt',    title: 'Line 1 Conveyor - Belt Tension Check',  equipment: 'Line 1 Conveyor',      frequency: 'Weekly',                duration: '15 minutes', assignedTo: 'John Smith',      dueStatus: 'due-soon', dueText: 'Due tomorrow',     status: 'due-soon',  lastCompleted: 'Feb 6, 2026', checklist: [{text:'Measure belt tension with gauge',checked:false,note:''},{text:'Check belt alignment',checked:false,note:''},{text:'Inspect belt for wear or damage',checked:false,note:''},{text:'Adjust tension if out of spec',checked:false,note:''}] },
-            { id: 'line2-oil',     title: 'Line 2 Mixer - Gearbox Oil Change',     equipment: 'Line 2 Mixer',         frequency: 'Quarterly',             duration: '1 hour',     assignedTo: 'Mike Johnson',    dueStatus: 'upcoming', dueText: 'Due in 5 days',    status: 'upcoming',  lastCompleted: 'Nov 14, 2025', checklist: [{text:'Drain old oil completely',checked:false,note:''},{text:'Inspect drain plug magnet for metal particles',checked:false,note:''},{text:'Replace oil filter',checked:false,note:''},{text:'Fill with correct grade oil to spec level',checked:false,note:''},{text:'Run for 5 minutes and recheck level',checked:false,note:''},{text:'Record oil type and quantity used',checked:false,note:''}] }
+            { id: 'fire-alarm',    title: '🔥 Fire Alarm System - Weekly Test',    equipment: 'Facility-Wide',        frequency: 'Weekly (Every Monday)', duration: '15 minutes', assignedTo: 'Mike Johnson',    dueStatus: 'overdue',  dueText: 'Overdue by 1 day', status: 'overdue',   lastCompleted: 'Feb 5, 2026', scheduledDate: '2026-02-24', checklist: [{text:'Test all call points on each floor',checked:false,note:''},{text:'Verify panel shows no faults',checked:false,note:''},{text:'Check sounder/beacon activation',checked:false,note:''},{text:'Log result in fire safety register',checked:false,note:''}] },
+            { id: 'emerg-light',   title: '💡 Emergency Lighting - Monthly Test',   equipment: 'All Emergency Exits',  frequency: 'Monthly (1st of month)', duration: '45 minutes', assignedTo: 'Sarah Williams',  dueStatus: 'due-soon', dueText: 'Due in 2 days',    status: 'due-soon',  lastCompleted: 'Jan 1, 2026', scheduledDate: '2026-03-01', checklist: [{text:'Activate test switch on each unit',checked:false,note:''},{text:'Verify illumination for 3+ hours',checked:false,note:''},{text:'Replace any failed bulbs/batteries',checked:false,note:''},{text:'Record results in maintenance log',checked:false,note:''}] },
+            { id: 'line3-lube',    title: 'Line 3 Filler - Monthly Lubrication',   equipment: 'Line 3 Filler',        frequency: 'Monthly',               duration: '30 minutes', assignedTo: 'Sarah Williams',  dueStatus: 'overdue',  dueText: 'Overdue by 2 days', status: 'overdue',  lastCompleted: 'Jan 12, 2026', scheduledDate: '2026-02-23', checklist: [{text:'Grease all bearing points',checked:false,note:''},{text:'Check oil level in gearbox',checked:false,note:''},{text:'Inspect seals for leaks',checked:false,note:''},{text:'Clean excess lubricant',checked:false,note:''},{text:'Record lubricant quantities used',checked:false,note:''}] },
+            { id: 'line1-belt',    title: 'Line 1 Conveyor - Belt Tension Check',  equipment: 'Line 1 Conveyor',      frequency: 'Weekly',                duration: '15 minutes', assignedTo: 'John Smith',      dueStatus: 'due-soon', dueText: 'Due tomorrow',     status: 'due-soon',  lastCompleted: 'Feb 6, 2026', scheduledDate: '2026-02-26', checklist: [{text:'Measure belt tension with gauge',checked:false,note:''},{text:'Check belt alignment',checked:false,note:''},{text:'Inspect belt for wear or damage',checked:false,note:''},{text:'Adjust tension if out of spec',checked:false,note:''}] },
+            { id: 'line2-oil',     title: 'Line 2 Mixer - Gearbox Oil Change',     equipment: 'Line 2 Mixer',         frequency: 'Quarterly',             duration: '1 hour',     assignedTo: 'Mike Johnson',    dueStatus: 'upcoming', dueText: 'Due in 5 days',    status: 'upcoming',  lastCompleted: 'Nov 14, 2025', scheduledDate: '2026-03-02', checklist: [{text:'Drain old oil completely',checked:false,note:''},{text:'Inspect drain plug magnet for metal particles',checked:false,note:''},{text:'Replace oil filter',checked:false,note:''},{text:'Fill with correct grade oil to spec level',checked:false,note:''},{text:'Run for 5 minutes and recheck level',checked:false,note:''},{text:'Record oil type and quantity used',checked:false,note:''}] }
         ]);
 
         // Migrate existing PM data: add checklist if missing
@@ -4665,6 +4691,9 @@
         pmData.forEach(function(pm) {
             if (!pm.checklist || pm.checklist.length === 0) {
                 pm.checklist = defaultChecklists[pm.id] || [];
+            }
+            if (typeof pm.scheduledDate === 'undefined') {
+                pm.scheduledDate = '';
             }
         });
         saveData('pmSchedule', pmData);
@@ -4903,23 +4932,46 @@
             </div>`).join('');
         }
 
-        function renderPM() {
+        function renderPM(data) {
+            data = data || pmData;
             const container = document.getElementById('pmList');
             if (!container) return;
-            if (pmData.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔄</div><div class="empty-state-title">No PM Tasks</div><div class="empty-state-text">Click "+ Schedule PM" to add tasks.</div></div>';
+
+            // Populate equipment filter dropdown
+            var eqSelect = document.getElementById('pmFilterEquipment');
+            if (eqSelect && eqSelect.options.length <= 1) {
+                var equipments = [];
+                pmData.forEach(function(pm) {
+                    if (equipments.indexOf(pm.equipment) === -1) equipments.push(pm.equipment);
+                });
+                equipments.sort();
+                eqSelect.innerHTML = '<option value="">All Equipment</option>' +
+                    equipments.map(function(eq) { return '<option value="' + escHtml(eq) + '">' + escHtml(eq) + '</option>'; }).join('');
+            }
+
+            if (data.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔄</div><div class="empty-state-title">No PM Tasks</div><div class="empty-state-text">No tasks match the current filter.</div></div>';
                 return;
             }
-            container.innerHTML = pmData.map(pm => {
-                const itemClass = pm.dueStatus === 'overdue' ? 'pm-item overdue' : pm.dueStatus === 'due-soon' ? 'pm-item due-soon' : 'pm-item';
-                const dueDateClass = pm.dueStatus === 'overdue' ? 'overdue' : pm.dueStatus === 'due-soon' ? 'due-soon' : 'upcoming';
+            container.innerHTML = data.map(pm => {
+                const isCompleted = pm.status === 'completed';
+                const itemClass = isCompleted ? 'pm-item' : pm.dueStatus === 'overdue' ? 'pm-item overdue' : pm.dueStatus === 'due-soon' ? 'pm-item due-soon' : 'pm-item';
+                const dueDateClass = isCompleted ? 'upcoming' : pm.dueStatus === 'overdue' ? 'overdue' : pm.dueStatus === 'due-soon' ? 'due-soon' : 'upcoming';
                 const checkCount = pm.checklist ? pm.checklist.length : 0;
                 const checkBadge = checkCount > 0
                     ? `<div class="wo-meta-item"><span>📋</span><span>${checkCount} checks</span></div>`
                     : '';
-                const actionBtn = (pm.dueStatus === 'overdue' || pm.dueStatus === 'due-soon')
-                    ? `<button class="btn btn-danger" onclick="completePM('${pm.id}')">Complete Now</button>`
-                    : `<button class="btn btn-primary" onclick="completePM('${pm.id}')">Complete</button>`;
+                const scheduledBadge = pm.scheduledDate
+                    ? `<div class="wo-meta-item"><span>📅</span><span>${new Date(pm.scheduledDate + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}</span></div>`
+                    : '';
+                var actionBtn;
+                if (isCompleted) {
+                    actionBtn = `<span class="status-badge" style="background:var(--success);color:#fff;font-size:0.8rem;">Completed</span>`;
+                } else if (pm.dueStatus === 'overdue' || pm.dueStatus === 'due-soon') {
+                    actionBtn = `<button class="btn btn-danger" onclick="completePM('${pm.id}')">Complete Now</button>`;
+                } else {
+                    actionBtn = `<button class="btn btn-primary" onclick="completePM('${pm.id}')">Complete</button>`;
+                }
                 var assignSelect = '<select class="form-select" style="font-size:0.8rem;padding:0.25rem 0.4rem;min-width:130px;" onchange="reassignPM(\'' + pm.id + '\', this.value)">' +
                     '<option value="John Smith"' + (pm.assignedTo === 'John Smith' ? ' selected' : '') + '>John Smith</option>' +
                     '<option value="Mike Johnson"' + (pm.assignedTo === 'Mike Johnson' ? ' selected' : '') + '>Mike Johnson</option>' +
@@ -4933,6 +4985,7 @@
                             <div class="wo-meta-item"><span>🔄</span><span>${escHtml(pm.frequency)}</span></div>
                             <div class="wo-meta-item"><span>⏱️</span><span>${escHtml(pm.duration)}</span></div>
                             <div class="wo-meta-item"><span>👤</span>${assignSelect}</div>
+                            ${scheduledBadge}
                             ${checkBadge}
                         </div>
                     </div>
@@ -5781,10 +5834,28 @@
                 dueStatus, dueText,
                 status: dueStatus,
                 lastCompleted: '—',
+                scheduledDate: dueDate,
                 checklist: checklist
             });
 
+            // Auto-create calendar event for the scheduled PM
+            if (dueDate) {
+                var calType = frequency.toLowerCase().indexOf('week') !== -1 ? 'weekly-pm' : 'monthly-pm';
+                calendarEvents.push({
+                    id: nextCalId++,
+                    title: taskName,
+                    equipment: equipment,
+                    type: calType,
+                    date: dueDate,
+                    duration: duration || '30 min',
+                    assignedTo: assignTo,
+                    notes: 'Auto-scheduled PM',
+                    status: 'planned'
+                });
+            }
+
             renderPM();
+            renderCalendar();
             closeModal('addPMModal');
             document.getElementById('addPMForm').reset();
             pmChecklistItems = [];
@@ -5884,10 +5955,10 @@
             if (!startTime || !finishTime) { showToast('Please enter start and finish times.', 'error'); return; }
 
             var now = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-            pm.status = 'upcoming';
-            pm.dueStatus = 'upcoming';
+            pm.status = 'completed';
+            pm.dueStatus = 'completed';
             pm.lastCompleted = now;
-            pm.dueText = 'Next due: scheduled';
+            pm.dueText = 'Completed: ' + now;
             pm.lastChecklistResults = JSON.parse(JSON.stringify(pm.checklist || []));
             pm.completedBy = pm.assignedTo;
             pm.completedAt = now;
@@ -6230,6 +6301,33 @@
             document.getElementById('brFilterFrom').value    = '';
             document.getElementById('brFilterTo').value      = '';
             renderBreakdowns();
+        }
+
+        function filterPMs() {
+            var status    = document.getElementById('pmFilterStatus').value;
+            var equipment = document.getElementById('pmFilterEquipment').value;
+            var from      = document.getElementById('pmFilterFrom').value;
+            var to        = document.getElementById('pmFilterTo').value;
+            var filtered  = pmData.slice();
+            if (status === 'completed') {
+                filtered = filtered.filter(function(pm) { return pm.status === 'completed'; });
+            } else if (status === 'scheduled') {
+                filtered = filtered.filter(function(pm) { return pm.status !== 'completed' && pm.scheduledDate; });
+            } else if (status === 'unscheduled') {
+                filtered = filtered.filter(function(pm) { return pm.status !== 'completed' && !pm.scheduledDate; });
+            }
+            if (equipment) filtered = filtered.filter(function(pm) { return pm.equipment === equipment; });
+            if (from) filtered = filtered.filter(function(pm) { return pm.scheduledDate && pm.scheduledDate >= from; });
+            if (to)   filtered = filtered.filter(function(pm) { return pm.scheduledDate && pm.scheduledDate <= to; });
+            renderPM(filtered);
+        }
+
+        function clearPMFilter() {
+            document.getElementById('pmFilterStatus').value    = '';
+            document.getElementById('pmFilterEquipment').value = '';
+            document.getElementById('pmFilterFrom').value      = '';
+            document.getElementById('pmFilterTo').value        = '';
+            renderPM();
         }
 
         function toggleBrResolutionField() {
