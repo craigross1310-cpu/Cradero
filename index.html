@@ -2258,7 +2258,41 @@
                     </div>
                 </div>
 
-                <div class="pm-list" id="pmList"></div>
+                <div id="pmSubTabToggle" style="display:flex;gap:0.5rem;border-bottom:2px solid var(--gray-200);margin-bottom:1rem;">
+                    <button class="btn btn-secondary" id="pmSubTabScheduledBtn"
+                            style="border-radius:6px 6px 0 0;border-bottom:3px solid var(--primary);"
+                            onclick="switchPMSubTab('scheduled')">Scheduled</button>
+                    <button class="btn btn-secondary" id="pmSubTabCompletedBtn"
+                            style="border-radius:6px 6px 0 0;"
+                            onclick="switchPMSubTab('completed')">Completed History</button>
+                </div>
+
+                <div id="pmScheduledView">
+                    <div class="pm-list" id="pmList"></div>
+                </div>
+
+                <div id="pmCompletedView" style="display:none;">
+                    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Machine</label>
+                            <select class="form-select" id="pmCompletedFilterMachine" style="min-width:180px;" onchange="renderCompletedPMs()"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Engineer</label>
+                            <select class="form-select" id="pmCompletedFilterEngineer" style="min-width:180px;" onchange="renderCompletedPMs()"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">From</label>
+                            <input type="date" class="form-input" id="pmCompletedFilterFrom" onchange="renderCompletedPMs()">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">To</label>
+                            <input type="date" class="form-input" id="pmCompletedFilterTo" onchange="renderCompletedPMs()">
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="clearCompletedPMFilters()" style="align-self:flex-end;">Clear</button>
+                    </div>
+                    <div id="pmCompletedList"></div>
+                </div>
             </div>
         </div>
 
@@ -3824,6 +3858,36 @@
         </div>
     </div>
 
+    <!-- PM History Modal (per-task completion list) -->
+    <div id="pmHistoryModal" class="modal-overlay">
+        <div class="modal" style="max-width:900px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="pmHistoryModalTitle">PM Completion History</h2>
+            </div>
+            <div class="modal-body" id="pmHistoryModalBody">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pmHistoryModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PM Completion Detail Modal (single audit record, read-only) -->
+    <div id="pmCompletionDetailModal" class="modal-overlay">
+        <div class="modal" style="max-width:800px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Completion Record</h2>
+            </div>
+            <div class="modal-body" id="pmCompletionDetailBody">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pmCompletionDetailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit PM Modal (Manager/Admin only) -->
     <div id="editPMModal" class="modal-overlay">
         <div class="modal">
@@ -5369,6 +5433,20 @@
                     var r = await supabaseClient.from('pm_completions').select('*').not('parts_used', 'is', null).order('completed_at', { ascending: false });
                     if (r.error) throw r.error;
                     return r.data || [];
+                },
+                listCompletionsDetailed: async function(filters) {
+                    var q = supabaseClient
+                        .from('pm_completions')
+                        .select('id, pm_task_id, completed_by, completed_at, checklist_results, notes, photo_urls, parts_used, pm_tasks ( id, title, equipment_name, frequency )')
+                        .order('completed_at', { ascending: false })
+                        .limit(500);
+                    if (filters && filters.pmTaskId) q = q.eq('pm_task_id', filters.pmTaskId);
+                    if (filters && filters.from)     q = q.gte('completed_at', filters.from);
+                    if (filters && filters.to)       q = q.lte('completed_at', filters.to + 'T23:59:59');
+                    if (filters && filters.engineerId) q = q.eq('completed_by', filters.engineerId);
+                    var r = await q;
+                    if (r.error) throw r.error;
+                    return r.data || [];
                 }
             },
             // --- Calendar Events ---
@@ -5585,6 +5663,12 @@
             var laborCostsCard = document.getElementById('laborCostsCard');
             if (laborCostsCard) {
                 laborCostsCard.style.display = (role === 'admin' || role === 'manager') ? '' : 'none';
+            }
+            // Hide PM Completed History sub-tab for production/pending (engineer+ only).
+            // Defence in depth — RLS is the authoritative backstop.
+            if (role !== 'engineer' && role !== 'manager' && role !== 'admin') {
+                var compBtn = document.getElementById('pmSubTabCompletedBtn');
+                if (compBtn) compBtn.style.display = 'none';
             }
         }
 
@@ -7128,6 +7212,7 @@
                     <div style="display:flex;gap:0.5rem;flex-direction:column;align-items:flex-end;">
                         ${actionBtn}
                         <button class="btn btn-secondary btn-small" onclick="openPMDetail('${pm.id}')">View</button>
+                        ${(currentUserRole === 'engineer' || currentUserRole === 'manager' || currentUserRole === 'admin') ? `<button class="btn btn-secondary btn-small" onclick="viewPMHistory('${pm.id}')">View History</button>` : ''}
                         ${(currentUserRole === 'admin' || currentUserRole === 'manager') ? '<button class="btn btn-secondary btn-small" onclick="openEditPM(\'' + pm.id + '\')">Edit</button>' : ''}
                         <button class="btn btn-danger btn-small" onclick="deletePM('${pm.id}')">Delete</button>
                     </div>
@@ -11724,6 +11809,257 @@
 
             body.innerHTML = html;
             openModal('pmDetailModal');
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // COMPLETED PM HISTORY (audit view — read-only)
+        // ─────────────────────────────────────────────────────────────────────
+        var pmCompletedCache = [];
+        var pmCompletedLoaded = false;
+
+        function pmCompletionEngineerName(completion) {
+            if (!completion || !completion.completed_by) return '—';
+            var p = staffProfiles.find(function(sp) { return sp.id === completion.completed_by; });
+            return p ? (p.full_name || p.email || '—') : '—';
+        }
+
+        function pmCompletionFormatDate(iso) {
+            if (!iso) return '—';
+            try {
+                return new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+            } catch (e) { return iso; }
+        }
+
+        async function loadCompletedPMs() {
+            try {
+                pmCompletedCache = await CraderoAPI.pm.listCompletionsDetailed({});
+                pmCompletedLoaded = true;
+            } catch (e) {
+                console.error('[Cradero] Failed to load PM completions:', e);
+                pmCompletedCache = [];
+                pmCompletedLoaded = false;
+                showToast('Failed to load completed PMs: ' + (e.message || e), 'error');
+            }
+        }
+
+        function populateCompletedPMFilters() {
+            var machineSel = document.getElementById('pmCompletedFilterMachine');
+            var engSel = document.getElementById('pmCompletedFilterEngineer');
+            if (!machineSel || !engSel) return;
+            var machines = {}, engineers = {};
+            pmCompletedCache.forEach(function(c) {
+                var m = c.pm_tasks && c.pm_tasks.equipment_name;
+                if (m) machines[m] = true;
+                var e = pmCompletionEngineerName(c);
+                if (e && e !== '—') engineers[e] = true;
+            });
+            var prevMachine = machineSel.value;
+            var prevEng = engSel.value;
+            machineSel.innerHTML = '<option value="">All Machines</option>' +
+                Object.keys(machines).sort().map(function(m) { return '<option value="' + escHtml(m) + '">' + escHtml(m) + '</option>'; }).join('');
+            engSel.innerHTML = '<option value="">All Engineers</option>' +
+                Object.keys(engineers).sort().map(function(e) { return '<option value="' + escHtml(e) + '">' + escHtml(e) + '</option>'; }).join('');
+            if (prevMachine) machineSel.value = prevMachine;
+            if (prevEng) engSel.value = prevEng;
+        }
+
+        function clearCompletedPMFilters() {
+            ['pmCompletedFilterMachine', 'pmCompletedFilterEngineer', 'pmCompletedFilterFrom', 'pmCompletedFilterTo'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            renderCompletedPMs();
+        }
+
+        function renderCompletedPMs() {
+            var listEl = document.getElementById('pmCompletedList');
+            if (!listEl) return;
+            var mFilter = (document.getElementById('pmCompletedFilterMachine') || {}).value || '';
+            var eFilter = (document.getElementById('pmCompletedFilterEngineer') || {}).value || '';
+            var fFilter = (document.getElementById('pmCompletedFilterFrom') || {}).value || '';
+            var tFilter = (document.getElementById('pmCompletedFilterTo') || {}).value || '';
+
+            var rows = pmCompletedCache.filter(function(c) {
+                var m = (c.pm_tasks && c.pm_tasks.equipment_name) || '';
+                var e = pmCompletionEngineerName(c);
+                var d = (c.completed_at || '').slice(0, 10);
+                if (mFilter && m !== mFilter) return false;
+                if (eFilter && e !== eFilter) return false;
+                if (fFilter && d < fFilter) return false;
+                if (tFilter && d > tFilter) return false;
+                return true;
+            });
+
+            if (rows.length === 0) {
+                listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>' +
+                    '<div class="empty-state-title">No Completions Found</div>' +
+                    '<div class="empty-state-text">Adjust filters or complete some PMs.</div></div>';
+                return;
+            }
+
+            listEl.innerHTML = rows.map(function(c) {
+                var title = (c.pm_tasks && c.pm_tasks.title) || '(PM removed)';
+                var machine = (c.pm_tasks && c.pm_tasks.equipment_name) || '—';
+                var eng = pmCompletionEngineerName(c);
+                var when = pmCompletionFormatDate(c.completed_at);
+                return '<div class="pm-item" style="cursor:pointer;" onclick="viewPMCompletionDetail(\'' + escHtml(String(c.id)) + '\')">' +
+                    '<div class="pm-info">' +
+                      '<div class="pm-title">' + escHtml(title) + '</div>' +
+                      '<div class="pm-meta">' +
+                        '<div class="wo-meta-item"><span>🏭</span><span>' + escHtml(machine) + '</span></div>' +
+                        '<div class="wo-meta-item"><span>👤</span><span>' + escHtml(eng) + '</span></div>' +
+                        '<div class="wo-meta-item"><span>✅</span><span>' + escHtml(when) + '</span></div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;gap:0.5rem;flex-direction:column;align-items:flex-end;">' +
+                      '<button class="btn btn-secondary btn-small" onclick="event.stopPropagation();viewPMCompletionDetail(\'' + escHtml(String(c.id)) + '\')">Details</button>' +
+                    '</div>' +
+                  '</div>';
+            }).join('');
+        }
+
+        async function switchPMSubTab(which) {
+            var schedView = document.getElementById('pmScheduledView');
+            var compView = document.getElementById('pmCompletedView');
+            var schedBtn = document.getElementById('pmSubTabScheduledBtn');
+            var compBtn = document.getElementById('pmSubTabCompletedBtn');
+            if (!schedView || !compView) return;
+            if (which === 'completed') {
+                schedView.style.display = 'none';
+                compView.style.display = '';
+                if (schedBtn) schedBtn.style.borderBottom = 'none';
+                if (compBtn) compBtn.style.borderBottom = '3px solid var(--primary)';
+                if (!pmCompletedLoaded) {
+                    var listEl = document.getElementById('pmCompletedList');
+                    if (listEl) listEl.innerHTML = '<div style="padding:1rem;color:var(--gray-500);">Loading…</div>';
+                    await loadCompletedPMs();
+                }
+                populateCompletedPMFilters();
+                renderCompletedPMs();
+            } else {
+                schedView.style.display = '';
+                compView.style.display = 'none';
+                if (schedBtn) schedBtn.style.borderBottom = '3px solid var(--primary)';
+                if (compBtn) compBtn.style.borderBottom = 'none';
+            }
+        }
+
+        async function viewPMHistory(pmId) {
+            if (currentUserRole !== 'engineer' && currentUserRole !== 'manager' && currentUserRole !== 'admin') {
+                showToast('You do not have permission to view PM history.', 'error');
+                return;
+            }
+            var pm = pmData.find(function(p) { return p.id === pmId; });
+            var titleEl = document.getElementById('pmHistoryModalTitle');
+            var body = document.getElementById('pmHistoryModalBody');
+            if (titleEl) titleEl.textContent = 'History — ' + (pm ? pm.title : 'PM Task');
+            if (body) body.innerHTML = '<div style="padding:1rem;color:var(--gray-500);">Loading…</div>';
+            openModal('pmHistoryModal');
+            try {
+                var rows = await CraderoAPI.pm.listCompletionsDetailed({ pmTaskId: pmId });
+                rows.forEach(function(r) {
+                    if (!pmCompletedCache.find(function(c) { return String(c.id) === String(r.id); })) {
+                        pmCompletedCache.push(r);
+                    }
+                });
+                if (!rows.length) {
+                    body.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>' +
+                        '<div class="empty-state-title">No completions yet</div>' +
+                        '<div class="empty-state-text">This PM has not been completed yet.</div></div>';
+                    return;
+                }
+                body.innerHTML = rows.map(function(c) {
+                    var eng = pmCompletionEngineerName(c);
+                    var when = pmCompletionFormatDate(c.completed_at);
+                    return '<div style="padding:0.75rem 1rem;background:var(--gray-100);border-radius:8px;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;">' +
+                        '<div>' +
+                          '<div style="font-weight:600;">' + escHtml(when) + '</div>' +
+                          '<div style="font-size:0.85rem;color:var(--gray-600);">Completed by ' + escHtml(eng) + '</div>' +
+                        '</div>' +
+                        '<button class="btn btn-secondary btn-small" onclick="viewPMCompletionDetail(\'' + escHtml(String(c.id)) + '\')">Details</button>' +
+                      '</div>';
+                }).join('');
+            } catch (e) {
+                body.innerHTML = '<div style="color:var(--danger);padding:1rem;">Error loading history: ' + escHtml(e.message || String(e)) + '</div>';
+            }
+        }
+
+        function renderPMCompletionDetail(c) {
+            var body = document.getElementById('pmCompletionDetailBody');
+            if (!body) return;
+            var pmInfo = c.pm_tasks || {};
+            var title = pmInfo.title || '(PM removed)';
+            var machine = pmInfo.equipment_name || '—';
+            var eng = pmCompletionEngineerName(c);
+            var when = pmCompletionFormatDate(c.completed_at);
+            var checks = Array.isArray(c.checklist_results) ? c.checklist_results : [];
+            var photos = Array.isArray(c.photo_urls) ? c.photo_urls : [];
+            var parts = Array.isArray(c.parts_used) ? c.parts_used : [];
+
+            var html = '<div style="margin-bottom:1rem;">' +
+                '<div style="font-weight:700;font-size:1.1rem;margin-bottom:0.25rem;">' + escHtml(title) + '</div>' +
+                '<div style="color:var(--gray-600);font-size:0.9rem;">' +
+                  '🏭 ' + escHtml(machine) +
+                  ' &nbsp;·&nbsp; 👤 ' + escHtml(eng) +
+                  ' &nbsp;·&nbsp; ✅ ' + escHtml(when) +
+                '</div>' +
+              '</div>';
+
+            if (c.notes) {
+                html += '<div style="margin-bottom:1rem;"><b>Notes:</b>' +
+                    '<div style="white-space:pre-wrap;background:var(--gray-100);padding:0.5rem 0.75rem;border-radius:6px;margin-top:0.25rem;">' + escHtml(c.notes) + '</div></div>';
+            }
+
+            if (checks.length) {
+                html += '<div style="margin-bottom:1rem;"><b>Checklist:</b><ul style="margin:0.5rem 0 0 1.25rem;padding:0;">' +
+                    checks.map(function(item) {
+                        var checked = item && (item.checked || item.completed) ? '☑' : '☐';
+                        var text = (item && (item.text || item.label)) || '';
+                        var note = item && item.note ? ' — <i>' + escHtml(item.note) + '</i>' : '';
+                        return '<li>' + checked + ' ' + escHtml(text) + note + '</li>';
+                    }).join('') + '</ul></div>';
+            }
+
+            if (parts.length) {
+                html += '<div style="margin-bottom:1rem;"><b>Parts Used:</b><ul style="margin:0.5rem 0 0 1.25rem;padding:0;">' +
+                    parts.map(function(p) {
+                        var name = (p && (p.name || p.partName || p.part_name)) || '—';
+                        var qty = (p && (p.qty || p.quantity)) || 0;
+                        return '<li>' + escHtml(name) + ' × ' + escHtml(String(qty)) + '</li>';
+                    }).join('') + '</ul></div>';
+            }
+
+            if (photos.length) {
+                html += '<div><b>Photos:</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:0.5rem;">' +
+                    photos.map(function(u) {
+                        var safeUrl = escHtml(u);
+                        return '<a href="' + safeUrl + '" target="_blank" rel="noopener"><img src="' + safeUrl + '" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);"></a>';
+                    }).join('') + '</div></div>';
+            }
+
+            body.innerHTML = html;
+            openModal('pmCompletionDetailModal');
+        }
+
+        function viewPMCompletionDetail(completionId) {
+            if (currentUserRole !== 'engineer' && currentUserRole !== 'manager' && currentUserRole !== 'admin') {
+                showToast('You do not have permission to view PM completions.', 'error');
+                return;
+            }
+            var row = pmCompletedCache.find(function(c) { return String(c.id) === String(completionId); });
+            if (row) {
+                renderPMCompletionDetail(row);
+                return;
+            }
+            CraderoAPI.pm.listCompletionsDetailed({}).then(function(rows) {
+                pmCompletedCache = rows;
+                pmCompletedLoaded = true;
+                var found = rows.find(function(r) { return String(r.id) === String(completionId); });
+                if (found) renderPMCompletionDetail(found);
+                else showToast('Completion record not found.', 'error');
+            }).catch(function(e) {
+                showToast('Failed to load completion: ' + (e.message || e), 'error');
+            });
         }
 
         // ─────────────────────────────────────────────────────────────────────
