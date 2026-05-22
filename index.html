@@ -14,13 +14,14 @@
     <!-- SECURITY NOTE: 'unsafe-inline' is required because all JS/CSS is inline in this single-file SPA.
          To strengthen CSP, extract JS to an external .js file and use nonce-based or hash-based CSP.
          See: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://ckjdwiipogxdkehxqrzh.supabase.co; connect-src 'self' blob: data: https://ckjdwiipogxdkehxqrzh.supabase.co https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; frame-ancestors 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' blob: data: https://*.supabase.co https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; frame-ancestors 'none';">
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0/dist/umd/supabase.min.js" integrity="sha384-1+ItoWbWcmVSm+Y+dJaUt4SEWNA21/jxef+Z0TSHHVy/dEUxEUEnZ1bHn6GT5hj+" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-9Q0jWoineiIq95JeIyBsNV90KKLfDsbkj29k/YFxf76a2JwkHDYkMuSbNGN6XJfV" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" integrity="sha384-lQXOAyZwHXE55JFyrOMB7nY2Wv+m5ZWNtJcHrd1rceRQXAYNLak8ukN5TjBTcIwz" crossorigin="anonymous"></script>
+    <link rel="icon" href="data:,">
     <style>
         :root {
             --primary: #0066FF;
@@ -11346,12 +11347,20 @@
                 return { text: text, checked: false, note: '' };
             });
 
+            var eqMatch = equipmentList.find(function(e) { return e.name === equipment; });
+            if (!eqMatch) {
+                // The dropdown is populated from equipmentList so this shouldn't
+                // normally happen — but if equipment was deleted in another tab
+                // while this form was open, fail clearly instead of letting the
+                // NOT NULL constraint surface a confusing DB error.
+                showToast('That equipment is no longer available. Reload the page and try again.', 'error');
+                return;
+            }
             try {
-                var eqMatch = equipmentList.find(function(e) { return e.name === equipment; });
                 var dbRow = {
                     title: taskName, description: description,
                     equipment_name: equipment,
-                    equipment_id: eqMatch ? eqMatch.id : null,
+                    equipment_id: eqMatch.id,
                     frequency: frequency, duration: duration || '',
                     assigned_to: assignTo, next_due_date: dueDate,
                     due_status: dueStatus, is_active: true,
@@ -12336,6 +12345,9 @@
 
         // ─── CSV Import ───────────────────────────────────────────
         function parseCSV(text) {
+            // Strip UTF-8 BOM — Excel saves CSV with BOM by default and
+            // it would otherwise become part of the first header cell.
+            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
             text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             var rows = [];
             var row = [];
@@ -12695,17 +12707,26 @@
 
                     } else if (csvImportState.type === 'pm') {
                         var eqMatch = equipmentList.find(function(e) { return e.name.toLowerCase() === (r.data.equipment || '').toLowerCase(); });
+                        if (!eqMatch) {
+                            throw new Error('Equipment "' + (r.data.equipment || '(blank)') + '" not found — add it to the equipment register first.');
+                        }
+                        var freqRaw = (r.data.frequency || '').toLowerCase().trim();
+                        var freqAliases = { 'bi-weekly': 'biweekly', 'fortnightly': 'biweekly', 'semi-annual': 'semi_annual', 'semiannual': 'semi_annual', 'half-yearly': 'semi_annual', 'yearly': 'annual' };
+                        var freq = freqAliases[freqRaw] || freqRaw || 'monthly';
+                        if (['daily','weekly','biweekly','monthly','quarterly','semi_annual','annual'].indexOf(freq) === -1) {
+                            throw new Error('Frequency "' + r.data.frequency + '" is not valid. Use: daily, weekly, biweekly, monthly, quarterly, semi_annual, or annual.');
+                        }
                         var dbRow = {
                             title: r.data.title, description: r.data.description || '',
+                            equipment_id: eqMatch.id,
                             equipment_name: r.data.equipment,
-                            frequency: r.data.frequency || 'Monthly',
+                            frequency: freq,
                             duration: r.data.duration || '',
                             assigned_to: r.data.assignedTo || '',
                             next_due_date: r.data.scheduledDate || null,
                             due_status: 'upcoming', is_active: true,
                             checklist: [], created_by: currentUserName || 'CSV Import'
                         };
-                        if (eqMatch) dbRow.equipment_id = eqMatch.id;
                         var created = await CraderoAPI.pm.create(dbRow);
                         pmData.push(mapPmFromDb(created));
                         logAudit('create', 'pm', created.id, { title: r.data.title, source: 'csv_import' });
@@ -13397,6 +13418,14 @@
                 return;
             }
 
+            // breakdowns.equipment_id is NOT NULL — refuse to submit unless the
+            // machine name matches a row in the equipment register.
+            var eqMatch = equipmentList.find(function(e) { return e.name === machine; });
+            if (!eqMatch) {
+                showToast('Machine "' + machine + '" is not in the equipment register. Add it first, then log the breakdown.', 'error');
+                return;
+            }
+
             try {
                 var linkedWoId = null;
 
@@ -13407,17 +13436,15 @@
                         assignedTo: engineer || '', createdBy: engineer || 'System',
                         description: 'Auto-raised from Reactive Maintenance. Root cause: ' + (root || 'Under investigation.')
                     });
-                    var woEqMatch = equipmentList.find(function(e) { return e.name === machine; });
-                    if (woEqMatch) woDbRow.equipment_id = woEqMatch.id;
+                    woDbRow.equipment_id = eqMatch.id;
                     var woCreated = await CraderoAPI.workOrders.create(woDbRow);
                     workOrdersData.unshift(mapWoFromDb(woCreated));
                     renderWorkOrders();
                     linkedWoId = woCreated.id;
                 }
 
-                var eqMatch = equipmentList.find(function(e) { return e.name === machine; });
                 var brDbRow = {
-                    equipment_id: eqMatch ? eqMatch.id : null,
+                    equipment_id: eqMatch.id,
                     equipment_name: machine, title: fault,
                     description: fault, severity: 'high', status: ({ 'pending': 'reported', 'in-progress': 'repair_in_progress', 'resolved': 'resolved' }[status] || 'reported'),
                     fault_cause: faultCause,
