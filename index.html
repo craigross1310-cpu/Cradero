@@ -8355,23 +8355,40 @@
 
                 // Upload photos to Supabase Storage
                 var photoUrls = [];
+                var photoFailCount = 0;
+                var firstPhotoError = '';
                 if (uploadedFiles.length > 0) {
                     for (var fi = 0; fi < uploadedFiles.length; fi++) {
                         var file = uploadedFiles[fi];
                         var fileErr = validateUploadFile(file, ALLOWED_IMAGE_TYPES);
-                        if (fileErr) { showToast(fileErr, 'error'); continue; }
+                        if (fileErr) { showToast(fileErr, 'error'); photoFailCount++; if (!firstPhotoError) firstPhotoError = fileErr; continue; }
                         var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                         var filePath = dbRow.id + '/' + Date.now() + '_' + safeName;
                         try {
                             var upResult = await supabaseClient.storage.from('work-order-photos').upload(filePath, file);
-                            if (upResult.error) { console.error('[Cradero] Photo upload error:', upResult.error); continue; }
+                            if (upResult.error) {
+                                console.error('[Cradero] Photo upload error:', upResult.error);
+                                photoFailCount++;
+                                if (!firstPhotoError) firstPhotoError = upResult.error.message || 'Storage upload rejected';
+                                continue;
+                            }
                             var pubUrl = supabaseClient.storage.from('work-order-photos').getPublicUrl(filePath);
                             if (pubUrl.data && pubUrl.data.publicUrl) photoUrls.push(pubUrl.data.publicUrl);
-                        } catch (upErr) { console.error('[Cradero] Photo upload failed:', upErr); }
+                            else { photoFailCount++; if (!firstPhotoError) firstPhotoError = 'Could not resolve public URL'; }
+                        } catch (upErr) {
+                            console.error('[Cradero] Photo upload failed:', upErr);
+                            photoFailCount++;
+                            if (!firstPhotoError) firstPhotoError = upErr.message || String(upErr);
+                        }
                     }
                     if (photoUrls.length > 0) {
                         await CraderoAPI.workOrders.update(dbRow.id, { photo_urls: photoUrls, has_photos: true });
                         dbRow.photo_urls = photoUrls;
+                        dbRow.has_photos = true;
+                    } else if (uploadedFiles.length > 0) {
+                        // No photos saved — clear the has_photos flag we optimistically set
+                        await CraderoAPI.workOrders.update(dbRow.id, { has_photos: false });
+                        dbRow.has_photos = false;
                     }
                 }
 
@@ -8385,7 +8402,11 @@
                 document.getElementById('filePreview').innerHTML = '';
                 uploadedFiles = [];
                 refreshDashboards();
-                showToast('Work order created' + (photoUrls.length > 0 ? ' with ' + photoUrls.length + ' photo(s)' : '') + '!', 'success');
+                if (photoFailCount > 0) {
+                    showToast('Work order created, but ' + photoFailCount + ' photo(s) failed: ' + firstPhotoError + ' (check Storage bucket "work-order-photos" exists in Supabase)', 'error');
+                } else {
+                    showToast('Work order created' + (photoUrls.length > 0 ? ' with ' + photoUrls.length + ' photo(s)' : '') + '!', 'success');
+                }
             } catch (e) {
                 console.error('[Cradero] Failed to create work order:', e);
                 showToast('Failed to create work order. ' + (e.message || ''), 'error');
@@ -9083,19 +9104,41 @@
             var btn = document.getElementById('woDetailUploadBtn');
             if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
 
+            var existingCount = wo.photoUrls ? wo.photoUrls.length : 0;
             var photoUrls = wo.photoUrls ? wo.photoUrls.slice() : [];
+            var photoFailCount = 0;
+            var firstPhotoError = '';
+            var attemptedCount = woDetailUploadedFiles.length;
             for (var fi = 0; fi < woDetailUploadedFiles.length; fi++) {
                 var file = woDetailUploadedFiles[fi];
                 var fileErr = validateUploadFile(file, ALLOWED_IMAGE_TYPES);
-                if (fileErr) { showToast(fileErr, 'error'); continue; }
+                if (fileErr) { showToast(fileErr, 'error'); photoFailCount++; if (!firstPhotoError) firstPhotoError = fileErr; continue; }
                 var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                 var filePath = currentDetailWoId + '/' + Date.now() + '_' + safeName;
                 try {
                     var upResult = await supabaseClient.storage.from('work-order-photos').upload(filePath, file);
-                    if (upResult.error) { console.error('[Cradero] Photo upload error:', upResult.error); continue; }
+                    if (upResult.error) {
+                        console.error('[Cradero] Photo upload error:', upResult.error);
+                        photoFailCount++;
+                        if (!firstPhotoError) firstPhotoError = upResult.error.message || 'Storage upload rejected';
+                        continue;
+                    }
                     var pubUrl = supabaseClient.storage.from('work-order-photos').getPublicUrl(filePath);
                     if (pubUrl.data && pubUrl.data.publicUrl) photoUrls.push(pubUrl.data.publicUrl);
-                } catch (upErr) { console.error('[Cradero] Photo upload failed:', upErr); }
+                    else { photoFailCount++; if (!firstPhotoError) firstPhotoError = 'Could not resolve public URL'; }
+                } catch (upErr) {
+                    console.error('[Cradero] Photo upload failed:', upErr);
+                    photoFailCount++;
+                    if (!firstPhotoError) firstPhotoError = upErr.message || String(upErr);
+                }
+            }
+
+            var newlyUploaded = photoUrls.length - existingCount;
+            if (newlyUploaded <= 0) {
+                // Nothing new actually uploaded — don't pretend it worked
+                if (btn) { btn.disabled = false; btn.textContent = 'Upload Photos'; }
+                showToast(attemptedCount + ' photo(s) failed to upload: ' + (firstPhotoError || 'unknown error') + ' (check Storage bucket "work-order-photos" exists and has an INSERT policy for authenticated users)', 'error');
+                return;
             }
 
             try {
@@ -9119,7 +9162,11 @@
                 if (preview) preview.innerHTML = '';
                 if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.textContent = 'Upload Photos'; }
 
-                showToast('Photos uploaded successfully!', 'success');
+                if (photoFailCount > 0) {
+                    showToast(newlyUploaded + ' photo(s) uploaded — ' + photoFailCount + ' failed: ' + firstPhotoError, 'error');
+                } else {
+                    showToast(newlyUploaded + ' photo(s) uploaded successfully!', 'success');
+                }
             } catch (err) {
                 showToast('Failed to save photos: ' + err.message, 'error');
                 if (btn) { btn.disabled = false; btn.textContent = 'Upload Photos'; }
