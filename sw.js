@@ -1,8 +1,13 @@
-var CACHE_NAME = 'cradero-v3';
-var PRECACHE_URLS = [
+var CACHE_NAME = 'cradero-v4';
+// App shell — own-origin assets that MUST cache for offline use.
+var APP_SHELL_URLS = [
     './',
-    './index.html',
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    './index.html'
+];
+// CDN resources — best-effort. Install must not fail if a corporate firewall
+// blocks jsdelivr or it's temporarily unreachable.
+var CDN_URLS = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0/dist/umd/supabase.min.js',
     'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
@@ -14,11 +19,17 @@ function shouldNotCache(url) {
     return NO_CACHE_PATTERNS.some(function(p) { return pathname.indexOf(p) !== -1; });
 }
 
-// Install: precache app shell and CDN resources
+// Install: precache app shell (must succeed) + CDN resources (best-effort).
 self.addEventListener('install', function(event) {
     event.waitUntil(
         caches.open(CACHE_NAME).then(function(cache) {
-            return cache.addAll(PRECACHE_URLS);
+            return cache.addAll(APP_SHELL_URLS).then(function() {
+                // Best-effort CDN cache — individual failures are swallowed so
+                // a blocked CDN doesn't prevent service worker installation.
+                return Promise.all(CDN_URLS.map(function(url) {
+                    return cache.add(url).catch(function() { /* skip on failure */ });
+                }));
+            });
         }).then(function() {
             return self.skipWaiting();
         })
