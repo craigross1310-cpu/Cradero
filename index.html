@@ -5681,17 +5681,25 @@
         }
 
         function applyProductionRestrictions() {
-            if (currentUserTier !== 'pro') return; // Production role is a Pro feature
-            // Hide all nav tabs except Work Requests
+            // Production role only ever sees Work Requests, regardless of tier
             document.querySelectorAll('.nav-tab').forEach(function(btn) {
                 var onclick = btn.getAttribute('onclick') || '';
                 if (onclick.indexOf("switchTab('workRequests')") === -1) {
                     btn.style.display = 'none';
                 }
             });
-            // Hide header buttons: New Work Order, dark mode toggle
-            var headerBtns = document.querySelectorAll('.header-actions .btn-primary');
-            headerBtns.forEach(function(b) {
+            // Hide header notification-bell buttons (dark mode, QR scanner, notification bell)
+            document.querySelectorAll('.header-actions .notification-bell').forEach(function(b) {
+                b.style.display = 'none';
+            });
+            // Hide the notification dropdown panel in case it was left open
+            var notifDropdown = document.getElementById('notificationDropdown');
+            if (notifDropdown) {
+                notifDropdown.classList.remove('active');
+                notifDropdown.style.display = 'none';
+            }
+            // Hide New Work Order button
+            document.querySelectorAll('.header-actions .btn-primary').forEach(function(b) {
                 if (b.textContent.indexOf('New Work Order') !== -1) b.style.display = 'none';
             });
             // Hide stats grid / dashboard KPIs
