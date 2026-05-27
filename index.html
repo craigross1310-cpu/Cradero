@@ -6277,11 +6277,6 @@
                 equipmentList.forEach(function(eq) {
                     html += '<option value="' + escHtml(eq.name) + '">' + escHtml(eq.name) + '</option>';
                 });
-                // Add facility-wide options for PM
-                if (id === 'pmEquipment') {
-                    html += '<option value="Facility-Wide">Facility-Wide</option>';
-                    html += '<option value="All Emergency Exits">All Emergency Exits</option>';
-                }
                 sel.innerHTML = html;
                 if (current) sel.value = current;
             });
@@ -11470,11 +11465,13 @@
         }
 
         var currentCompletePMId = null;
+        var pmCompleteCommentsStartIdx = 0;
 
         function completePM(pmId) {
             var pm = pmData.find(function(p) { return p.id === pmId; });
             if (!pm) return;
             currentCompletePMId = pmId;
+            pmCompleteCommentsStartIdx = (pm.comments || []).length;
 
             // Reset checklist checked state for fresh completion
             var checklist = pm.checklist || [];
@@ -11714,12 +11711,28 @@
                 // Create a pm_completion record
                 var completedByNames = parseEngineers(completedByVal);
                 var completedByProfile = staffProfiles.find(function(p) { return completedByNames.indexOf(p.full_name) !== -1; });
+                // Gather notes entered during this completion session:
+                //   - new comments posted in the modal (indices >= snapshot)
+                //   - any unposted text still in the comment input box
+                var newComments = (pm.comments || []).slice(pmCompleteCommentsStartIdx);
+                var unpostedEl = document.getElementById('pmCompleteNewComment');
+                var unposted = unpostedEl ? (unpostedEl.value || '').trim() : '';
+                var notesText = 'Start: ' + startTime + ', Finish: ' + finishTime + ', Completed by: ' + completedByVal;
+                if (newComments.length > 0) {
+                    notesText += '\n\n' + newComments.map(function(nc) {
+                        return (nc.author ? nc.author + ': ' : '') + (nc.text || '');
+                    }).join('\n');
+                }
+                if (unposted) {
+                    notesText += '\n\n' + (currentUserName ? currentUserName + ': ' : '') + unposted;
+                }
+
                 var completionData = {
                     pm_task_id: pm.id,
                     completed_by: completedByProfile ? completedByProfile.id : null,
                     completed_at: nowDate.toISOString(),
                     checklist_results: pm.checklist || [],
-                    notes: 'Start: ' + startTime + ', Finish: ' + finishTime + ', Completed by: ' + completedByVal
+                    notes: notesText
                 };
                 if (pmPhotoUrls.length > 0) completionData.photo_urls = pmPhotoUrls;
                 if (pmPartsUsed.length > 0) completionData.parts_used = pmPartsUsed;
@@ -13331,9 +13344,6 @@
                 opt.value = eq.name; opt.textContent = eq.name;
                 sel.appendChild(opt);
             });
-            var fw = document.createElement('option');
-            fw.value = 'Facility-Wide'; fw.textContent = 'Facility-Wide';
-            sel.appendChild(fw);
             if (prev) sel.value = prev;
         }
 
