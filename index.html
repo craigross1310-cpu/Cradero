@@ -5507,6 +5507,13 @@
                     if (r.error) throw r.error;
                     return r.data || [];
                 },
+                listSince: async function(sinceIso) {
+                    var q = supabaseClient.from('parts_usage').select('*');
+                    if (sinceIso) q = q.gte('used_at', sinceIso);
+                    var r = await q.order('used_at', { ascending: false });
+                    if (r.error) throw r.error;
+                    return r.data || [];
+                },
                 delete: async function(id) {
                     var r = await supabaseClient.from('parts_usage').delete().eq('id', id);
                     if (r.error) throw r.error;
@@ -8059,24 +8066,78 @@
                 '<div class="metric-item" style="background:var(--success);color:white;"><span class="metric-label" style="color:white;">Compliance Rate</span><span class="metric-value" style="color:white;">' + rate + '%</span></div>';
         }
 
-        function renderCostBreakdown() {
+        function getPartEstimatedUnitCost(part) {
+            if (!part || !Array.isArray(part.suppliers) || !part.suppliers.length) return 0;
+            var prices = part.suppliers
+                .map(function(s) { return parseFloat(s.price) || 0; })
+                .filter(function(p) { return p > 0; });
+            if (!prices.length) return 0;
+            return prices.reduce(function(a, b) { return a + b; }, 0) / prices.length;
+        }
+
+        async function renderCostBreakdown() {
             var container = document.getElementById('costBreakdownList');
             if (!container) return;
             var costCutoff = getAnalyticsCutoff();
-            // Calculate from work order time tracking and labor rates
             var laborRates = loadData('laborRates', {});
             var defaultLaborRate = loadData('laborDefaultRate', 25.00);
+
+            // Labor: tracked job time from work orders, with fallback to parsing totalJobTime string
             var laborTotal = 0;
             workOrdersData.forEach(function(wo) {
                 if (wo.createdRaw && new Date(wo.createdRaw) < costCutoff) return;
-                if (wo.timeSpent && wo.assignedTo) {
+                if (!wo.assignedTo) return;
+                var hours = wo.totalJobHours || 0;
+                if (!hours && wo.totalJobTime) {
+                    var match = wo.totalJobTime.match(/([\d]+)h\s*([\d]*)m?/);
+                    if (match) { hours = parseFloat(match[1]) + (match[2] ? parseFloat(match[2]) / 60 : 0); }
+                    else { var mMatch = wo.totalJobTime.match(/([\d]+)m/); if (mMatch) hours = parseFloat(mMatch[1]) / 60; }
+                }
+                if (hours > 0) {
                     var firstEng = parseEngineers(wo.assignedTo)[0] || '';
                     var rate = laborRates[firstEng] || defaultLaborRate;
-                    laborTotal += wo.timeSpent * rate;
+                    laborTotal += hours * rate;
                 }
             });
-            // Parts cost from PO data
-            var partsTotal = purchaseOrdersData.filter(function(po) { return po.status === 'received' && po.createdRaw && new Date(po.createdRaw) >= costCutoff; }).reduce(function(sum, po) { return sum + (parseFloat(po.total) || 0); }, 0);
+
+            // Parts: actual consumption — WO parts_usage + breakdown.partsUsed + pm_completions.parts_used
+            // Unit cost is the average of supplier prices on the part record (best estimate we have).
+            var partsTotal = 0;
+            var cutoffIso = costCutoff.toISOString();
+
+            try {
+                var woUsage = await CraderoAPI.partsUsage.listSince(cutoffIso);
+                woUsage.forEach(function(u) {
+                    var part = partsData.find(function(p) { return p.id === u.part_id; });
+                    partsTotal += getPartEstimatedUnitCost(part) * (u.quantity_used || 0);
+                });
+            } catch (e) { console.warn('[Cradero] Cost breakdown — parts_usage fetch failed:', e); }
+
+            breakdownsData.forEach(function(br) {
+                if (br.created && new Date(br.created) < costCutoff) return;
+                var pu = br.partsUsed;
+                if (typeof pu === 'string') { try { pu = JSON.parse(pu); } catch(e) { pu = []; } }
+                if (!Array.isArray(pu)) return;
+                pu.forEach(function(item) {
+                    var part = partsData.find(function(p) { return p.id === item.partId; });
+                    partsTotal += getPartEstimatedUnitCost(part) * (item.qty || 0);
+                });
+            });
+
+            try {
+                var pmComps = await CraderoAPI.pm.allCompletionsWithParts();
+                pmComps.forEach(function(c) {
+                    if (c.completed_at && new Date(c.completed_at) < costCutoff) return;
+                    var pu = c.parts_used;
+                    if (typeof pu === 'string') { try { pu = JSON.parse(pu); } catch(e) { pu = []; } }
+                    if (!Array.isArray(pu)) return;
+                    pu.forEach(function(item) {
+                        var part = partsData.find(function(p) { return p.id === item.partId; });
+                        partsTotal += getPartEstimatedUnitCost(part) * (item.qty || 0);
+                    });
+                });
+            } catch (e) { console.warn('[Cradero] Cost breakdown — pm_completions fetch failed:', e); }
+
             var grandTotal = laborTotal + partsTotal;
             var isManagerOrAbove = (currentUserRole === 'admin' || currentUserRole === 'manager');
             container.innerHTML =
