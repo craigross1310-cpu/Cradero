@@ -1,4 +1,4 @@
-var CACHE_NAME = 'cradero-v7';
+var CACHE_NAME = 'cradero-v9';
 // App shell — own-origin assets that MUST cache for offline use.
 var APP_SHELL_URLS = [
     './',
