@@ -3377,7 +3377,7 @@
                                 <input type="file" id="woDetailFileInput" multiple accept="image/*" style="display:none;" onchange="handleWoDetailFiles(this.files)">
                             </div>
                             <div id="woDetailFilePreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:0.5rem;"></div>
-                            <button type="button" class="btn btn-primary btn-small" id="woDetailUploadBtn" style="display:none;margin-top:0.5rem;" onclick="uploadWoDetailPhotos()">Upload Photos</button>
+                            <div style="font-size:0.75rem;color:var(--gray-500);margin-top:0.4rem;">Photos save when you click "Update Work Order".</div>
                         </div>
                     </div>
 
@@ -8481,8 +8481,6 @@
             woDetailUploadedFiles = [];
             var woDetailPreview = document.getElementById('woDetailFilePreview');
             if (woDetailPreview) woDetailPreview.innerHTML = '';
-            var woDetailUploadBtn = document.getElementById('woDetailUploadBtn');
-            if (woDetailUploadBtn) { woDetailUploadBtn.style.display = 'none'; woDetailUploadBtn.disabled = false; woDetailUploadBtn.textContent = 'Upload Photos'; }
 
             // Pre-fill update selects
             var woAssignWrap = document.getElementById('woUpdateAssignWrap');
@@ -8542,14 +8540,53 @@
                     }
                 }
             }
+            // Upload any pending photos before the WO save, so URLs are persisted atomically with everything else
+            var photoFailCount = 0;
+            var firstPhotoError = '';
+            var newlyUploadedCount = 0;
+            if (woDetailUploadedFiles.length > 0) {
+                var photoUrls = wo.photoUrls ? wo.photoUrls.slice() : [];
+                for (var fi = 0; fi < woDetailUploadedFiles.length; fi++) {
+                    var file = woDetailUploadedFiles[fi];
+                    var fileErr = validateUploadFile(file, ALLOWED_IMAGE_TYPES);
+                    if (fileErr) { showToast(fileErr, 'error'); photoFailCount++; if (!firstPhotoError) firstPhotoError = fileErr; continue; }
+                    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    var filePath = wo.id + '/' + Date.now() + '_' + safeName;
+                    try {
+                        var upResult = await supabaseClient.storage.from('work-order-photos').upload(filePath, file);
+                        if (upResult.error) {
+                            console.error('[Cradero] Photo upload error:', upResult.error);
+                            photoFailCount++;
+                            if (!firstPhotoError) firstPhotoError = upResult.error.message || 'Storage upload rejected';
+                            continue;
+                        }
+                        var pubUrl = supabaseClient.storage.from('work-order-photos').getPublicUrl(filePath);
+                        if (pubUrl.data && pubUrl.data.publicUrl) { photoUrls.push(pubUrl.data.publicUrl); newlyUploadedCount++; }
+                        else { photoFailCount++; if (!firstPhotoError) firstPhotoError = 'Could not resolve public URL'; }
+                    } catch (upErr) {
+                        console.error('[Cradero] Photo upload failed:', upErr);
+                        photoFailCount++;
+                        if (!firstPhotoError) firstPhotoError = upErr.message || String(upErr);
+                    }
+                }
+                wo.photoUrls = photoUrls;
+                wo.hasPhotos = photoUrls.length > 0;
+            }
             try {
                 await CraderoAPI.workOrders.update(wo.id, mapWoToDb(wo));
                 renderWorkOrders();
                 if (typeof renderEngineerDashboard === 'function') renderEngineerDashboard();
                 logAudit(wo.status === 'completed' ? 'complete' : 'update', 'work_order', wo.id, { status: wo.status, assignedTo: wo.assignedTo });
                 closeModal('workOrderDetailModal');
+                woDetailUploadedFiles = [];
                 refreshDashboards();
-                showToast('Work order updated!', 'success');
+                if (photoFailCount > 0) {
+                    showToast('Work order updated. ' + photoFailCount + ' photo(s) failed: ' + firstPhotoError, 'error');
+                } else if (newlyUploadedCount > 0) {
+                    showToast('Work order updated with ' + newlyUploadedCount + ' new photo(s)!', 'success');
+                } else {
+                    showToast('Work order updated!', 'success');
+                }
             } catch (e) {
                 console.error('[Cradero] Failed to update work order:', e);
                 showToast('Failed to update work order. ' + (e.message || ''), 'error');
@@ -9080,9 +9117,6 @@
                         preview.appendChild(item);
                     };
                     reader.readAsDataURL(file);
-                    // Show upload button
-                    var btn = document.getElementById('woDetailUploadBtn');
-                    if (btn) btn.style.display = '';
                 }
             });
         }
@@ -9090,10 +9124,6 @@
         function removeWoDetailFile(button, fileName) {
             woDetailUploadedFiles = woDetailUploadedFiles.filter(function(f) { return f.name !== fileName; });
             button.parentElement.remove();
-            if (woDetailUploadedFiles.length === 0) {
-                var btn = document.getElementById('woDetailUploadBtn');
-                if (btn) btn.style.display = 'none';
-            }
         }
 
         async function uploadWoDetailPhotos() {
@@ -14197,6 +14227,8 @@
             handlePMFiles, removePMFile,
             // PM Edit (Manager/Admin)
             openEditPM, submitEditPM, addEditPMCheckItem, removeEditPMCheckItem,
+            // PM Comments
+            addPMComment, addPMCompleteComment,
             // WO Detail Photo Upload
             handleWoDetailFiles, removeWoDetailFile, uploadWoDetailPhotos,
             // Downtime & Engineer Time Tracking
