@@ -2238,6 +2238,19 @@
                             <select class="form-select" id="pmFilterEquipment" style="min-width:180px;"></select>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Frequency</label>
+                            <select class="form-select" id="pmFilterFrequency" style="min-width:140px;">
+                                <option value="">All Frequencies</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Bi-Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="semi_annual">Semi-Annual</option>
+                                <option value="annual">Annual</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">From</label>
                             <input type="date" class="form-input" id="pmFilterFrom" style="min-width:140px;">
                         </div>
@@ -13512,6 +13525,7 @@
         function applyPmFilter() {
             var status    = document.getElementById('pmFilterStatus').value;
             var equipment = document.getElementById('pmFilterEquipment').value;
+            var frequency = document.getElementById('pmFilterFrequency').value;
             var from      = document.getElementById('pmFilterFrom').value;
             var to        = document.getElementById('pmFilterTo').value;
             var sortBy    = document.getElementById('pmSortBy').value;
@@ -13526,6 +13540,7 @@
                 filtered = filtered.filter(function(pm) { return !pm.scheduledDate; });
             }
             if (equipment) filtered = filtered.filter(function(pm) { return pm.equipment === equipment; });
+            if (frequency) filtered = filtered.filter(function(pm) { return (pm.frequency || '').toLowerCase() === frequency; });
             if (from) filtered = filtered.filter(function(pm) { return pm.scheduledDate && pm.scheduledDate >= from; });
             if (to)   filtered = filtered.filter(function(pm) { return pm.scheduledDate && pm.scheduledDate <= to; });
             if (sortBy === 'due-asc') filtered.sort(function(a, b) { return (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999'); });
@@ -13538,6 +13553,7 @@
         function clearPmFilter() {
             document.getElementById('pmFilterStatus').value    = '';
             document.getElementById('pmFilterEquipment').value = '';
+            document.getElementById('pmFilterFrequency').value = '';
             document.getElementById('pmFilterFrom').value      = '';
             document.getElementById('pmFilterTo').value        = '';
             document.getElementById('pmSortBy').value          = 'due-asc';
